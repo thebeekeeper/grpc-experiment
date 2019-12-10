@@ -1,16 +1,16 @@
-//#![deny(warnings, rust_2018_idioms)]
+#![deny(warnings, rust_2018_idioms)]
 
 use crate::hello_world::{server, HelloReply, HelloRequest};
 
 use futures::future::lazy;
-use std::sync::{Arc, Mutex};
 use futures::{future, Future, Stream};
 use log::error;
+use std::io::BufReader;
+use std::sync::{Arc, Mutex};
+use tokio::io;
 use tokio::net::TcpListener;
 use tower_grpc::{Request, Response};
 use tower_hyper::server::{Http, Server};
-use tokio::io;
-use std::io::BufReader;
 
 pub mod hello_world {
     include!(concat!(env!("OUT_DIR"), "/helloworld.rs"));
@@ -19,7 +19,7 @@ pub mod hello_world {
 #[derive(Clone, Debug)]
 struct Greet {
     // wrapping this in arc<mutex> makes it so it can be cloned, and we can access it across tasks
-    state: Arc<Mutex<State>>
+    state: Arc<Mutex<State>>,
 }
 
 #[derive(Debug)]
@@ -45,11 +45,9 @@ impl server::Greeter for Greet {
 pub fn main() {
     let _ = ::env_logger::init();
 
-    let greet = Greet { state: Arc::new(Mutex::new(
-        State {
-            switch_value: 100,
-        }
-    ))};
+    let greet = Greet {
+        state: Arc::new(Mutex::new(State { switch_value: 100 })),
+    };
     let stdin = io::stdin();
     let reader = BufReader::new(stdin);
     let lines = io::lines(reader);
@@ -90,10 +88,7 @@ pub fn main() {
         .map_err(|e| eprintln!("accept error: {}", e));
 
     tokio::run(lazy(|| {
-        tokio::spawn(lazy(move || {
-            serve
-        }
-        ));
+        tokio::spawn(lazy(move || serve));
         tokio::spawn(lazy(move || {
             println!("Press U to set switch value high");
             fut
